@@ -12,10 +12,9 @@ describe HighChartsHelper do
     @options     = "options"
   end
 
-  describe "layout_helper" do
+  context "layout_helper" do
     it "should return a div with an id of high_chart object" do
-      hc = LazyHighCharts::HighChart.new("placeholder", :class => 'stylin')
-      high_chart(hc.placeholder, hc).should have_selector('div', :id => hc.placeholder, :class => 'stylin')
+      high_chart(@placeholder, @chart).should have_selector('div', :id => @placeholder)
     end
 
     it "should return a script" do
@@ -24,7 +23,7 @@ describe HighChartsHelper do
     end
   end
 
-  describe "high_chart_graph" do
+  context "high_chart_graph" do
     describe "ready function" do
       it "should be a javascript script" do
         high_chart(@placeholder, @chart).should have_selector('script', :type => 'text/javascript')
@@ -41,18 +40,19 @@ describe HighChartsHelper do
     end
     describe "initialize HighChart" do
       it "should set variables `chart` `options`" do
-        high_chart(@placeholder, @chart).should include('var options, chart;')
+        high_chart(@placeholder, @chart).should match(/var\s+options\s+=/)
+        high_chart(@placeholder, @chart).should match(/window.chart_placeholder\s=/)
       end
       it "should set Chart data" do
-        high_chart(@placeholder, @chart).should match(/chart\s+=\s+new\s+Highcharts.Chart/)
+        high_chart(@placeholder, @chart).should match(/window\.chart_placeholder\s=\snew\sHighcharts.Chart/)
       end
 
-      it "should set chart renderTo" do  
-        high_chart(@placeholder, @chart).should match(/\"renderTo\":\"placeholder\"/)
+      it "should set chart renderTo" do
+        high_chart(@placeholder, @chart).should match(/"renderTo": "placeholder"/)
       end
 
       it "should set Chart Stock" do
-        high_stock(@placeholder, @chart).should match(/chart\s+=\s+new\s+Highcharts.StockChart/)
+        high_stock(@placeholder, @chart).should match(/window\.chart_placeholder\s+=\s+new\s+Highcharts.StockChart/)
       end
     end
 
@@ -83,6 +83,53 @@ describe HighChartsHelper do
       f.others(:foo =>"bar")
     }
     high_chart(@placeholder, chart).should match(/foo/)
+  end
+  
+  it "should allow js code as attribute" do
+    chart = LazyHighCharts::HighChart.new {|f|  
+      f.options[:foo] = "function () { alert('hello') }".js_code
+    }
+  
+    high_chart(@placeholder, chart).should match(/"foo": function \(\) { alert\('hello'\) }/)    
+  end
+  
+  it "should convert keys to proper format" do
+    chart = LazyHighCharts::HighChart.new {|f|  
+      f.options[:foo_bar] = { :bar_foo => "someattrib"}
+    }
+  
+    high_chart(@placeholder, chart).should match(/fooBar/)
+    high_chart(@placeholder, chart).should match(/barFoo/) 
+  end
+
+  # issue #62 .js_code setting ignored
+  # https://github.com/michelson/lazy_high_charts/issues/62
+  it "should allow js code in array && nest attributs" do
+    chart = LazyHighCharts::HighChart.new {|f|
+      f.yAxis([{
+        :labels => {
+                  :formatter => %|function() {return this.value + ' W';}|.js_code
+              }
+      }])
+    }
+    high_chart(@placeholder,chart).should match(/"formatter": function\(\) {return this.value \+ ' W';}/)
+  end
+
+  it "should support js_code in Individual data label for each point" do
+    chart = LazyHighCharts::HighChart.new {|f|
+       f.series(
+         :data => [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5, 216.4, 194.1, 95.6, {
+         :dataLabels => {:enabled => true,
+                         :align => 'left',
+                         :x => 10,
+                         :y => 4, 
+                         :style => {:fontWeight => 'bold'},
+                         :formatter => "function() { return this.x; }".js_code
+                        },
+        :y => 54.4}
+        ])
+    }
+    high_chart(@placeholder,chart).should match(/"formatter": function\(\) {\ return this.x;\ }/)
   end
 
 end
